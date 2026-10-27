@@ -1,0 +1,19 @@
+{
+  "name": "nocturne",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Nocturne · 夜航 — an immersive, audio-reactive listening stage for the web.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test",
+    "shot": "node tools/cdp.mjs",
+    "build:demos": "node tools/make-demos.mjs",
+    "build:covers": "node tools/make-covers.mjs",
+    "build:tags": "node tools/tag-demos.mjs",
+    "build:assets": "node tools/make-demos.mjs && node tools/make-covers.mjs && node tools/tag-demos.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

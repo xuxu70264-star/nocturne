@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 fill=%27%23030308%27/%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%277%27 fill=%27%238fd4ea%27/%3E%3C/svg%3E" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>WAVE · 水波</title>
+<style>
+  :root {
+    --ink: #030308;
+    --paper: #f3ece2;
+    --dim: rgba(243, 236, 226, 0.42);
+    --dimmer: rgba(243, 236, 226, 0.20);
+    --line: rgba(243, 236, 226, 0.10);
+    --accent: #e8c9a2;
+    --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Songti SC", "STSong", "SimSun", serif;
+    --font-sans: "Inter", "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: var(--ink); overflow: hidden; }
+  body { font-family: var(--font-sans); color: var(--paper); user-select: none; }
+  #stage { position: fixed; inset: 0; }
+  canvas { display: block; }
+
+  .vignette {
+    position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(120% 90% at 50% 42%, transparent 38%, rgba(0, 0, 0, 0.55) 82%, rgba(0, 0, 0, 0.82) 100%);
+  }
+
+  /* --- chrome --- */
+  .bar {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 22px clamp(20px, 3.4vw, 46px) 26px;
+    font-size: 11px; letter-spacing: 0.2em; color: var(--dim);
+    opacity: 0; transition: opacity 900ms var(--ease);
+    pointer-events: none;
+  }
+  body.is-live .bar { opacity: 1; }
+  .bar__left { display: flex; align-items: baseline; gap: 20px; min-width: 0; }
+  .bar__title {
+    font-family: var(--font-serif); font-size: 15px; letter-spacing: 0.04em;
+    color: rgba(243, 236, 226, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .bar__meta { font-size: 9px; letter-spacing: 0.26em; color: var(--dimmer); }
+  .bar__right { display: flex; align-items: center; gap: 10px; pointer-events: auto; }
+
+  .btn {
+    height: 40px; padding: 0 18px; border: 1px solid var(--line); border-radius: 999px;
+    background: transparent; color: var(--dim); font: inherit; letter-spacing: 0.2em;
+    cursor: pointer; transition: color 300ms var(--ease), border-color 300ms var(--ease), background 300ms var(--ease);
+  }
+  .btn:hover { color: var(--paper); border-color: rgba(232, 201, 162, 0.5); background: rgba(232, 201, 162, 0.06); }
+  .btn--icon { width: 44px; padding: 0; display: grid; place-items: center; }
+  .btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* --- intro --- */
+  .intro {
+    position: fixed; inset: 0; z-index: 5; display: grid; place-items: center;
+    background: radial-gradient(70% 60% at 50% 45%, rgba(10, 14, 22, 0.6), rgba(3, 4, 8, 0.92) 72%);
+    transition: opacity 900ms var(--ease), visibility 900ms;
+    cursor: pointer;
+  }
+  .intro.is-gone { opacity: 0; visibility: hidden; }
+  .intro__inner { text-align: center; display: grid; justify-items: center; }
+  .intro__word { font-size: 12px; letter-spacing: 0.7em; padding-left: 0.7em; color: var(--dim); }
+  .intro__cn {
+    font-family: var(--font-serif); font-size: clamp(40px, 7vw, 88px);
+    letter-spacing: 0.26em; padding-left: 0.26em; margin-top: 22px; color: var(--paper);
+  }
+  .intro__lead { margin-top: 18px; font-size: 11px; letter-spacing: 0.28em; color: var(--dimmer); }
+  .intro__hint { margin-top: 46px; font-size: 10px; letter-spacing: 0.22em; color: var(--dim); }
+  .intro__pulse { margin-top: 26px; width: 1px; height: 40px; background: linear-gradient(to bottom, transparent, var(--accent)); animation: drip 2.6s var(--ease) infinite; }
+  @keyframes drip { 0%, 100% { opacity: 0.2; transform: scaleY(0.5); } 50% { opacity: 1; transform: scaleY(1); } }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 92px; transform: translate(-50%, 10px);
+    padding: 10px 20px; border-radius: 999px; border: 1px solid var(--line);
+    background: rgba(10, 13, 20, 0.9); font-size: 11px; letter-spacing: 0.16em; color: var(--dim);
+    opacity: 0; pointer-events: none; transition: opacity 400ms var(--ease), transform 500ms var(--ease);
+  }
+  .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+  <div id="stage"></div>
+  <div class="vignette"></div>
+
+  <div class="bar">
+    <div class="bar__left">
+      <span class="bar__title" id="title">未加载音频</span>
+      <span class="bar__meta" id="meta">WAVE</span>
+    </div>
+    <div class="bar__right">
+      <button class="btn btn--icon" id="btn-play" type="button" aria-label="播放 / 暂停">
+        <svg viewBox="0 0 24 24"><path d="M8 5.2 19 12 8 18.8z"/></svg>
+      </button>
+      <button class="btn" id="btn-load" type="button">换一首</button>
+    </div>
+  </div>
+
+  <div class="intro" id="intro">
+    <div class="intro__inner">
+      <div class="intro__word">WAVE</div>
+      <div class="intro__cn">水 波</div>
+      <p class="intro__lead">声音落进水里，水面就记下它的形状。</p>
+      <div class="intro__pulse"></div>
+      <p class="intro__hint">点击任意处开始 · 可拖入本地音频</p>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <input type="file" id="file" accept="audio/*" hidden />
+  <audio id="audio" loop preload="auto" crossorigin="anonymous"></audio>
+
+  <script src="vendor/three.min.js"></script>
+  <script src="vendor/OrbitControls.js"></script>
+  <script>
+  (() => {
+    'use strict';
+
+    const params = new URLSearchParams(location.search);
+    const AUTO = params.has('auto');
+
+    /* ------------------------------------------------------------------
+       1. 场景
+       ------------------------------------------------------------------ */
+    const stage = document.getElementById('stage');
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x030308, 0.0042);
+
+    const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 1, 800);
+    camera.position.set(0, 36, 76);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+    renderer.setClearColor(0x030308, 1);
+    stage.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.055;
+    controls.maxPolarAngle = Math.PI / 2 - 0.06;
+    controls.minDistance = 30;
+    controls.maxDistance = 150;
+    controls.enablePan = false;
+
+    /* ------------------------------------------------------------------
+       2. 粒子网格
+       ------------------------------------------------------------------ */
+    const GRID = 120;              // 120 × 120 = 14,400 颗
+    const SEPARATION = 1.2;
+    const COUNT = GRID * GRID;
+
+    const positions = new Float32Array(COUNT * 3);
+    const colors = new Float32Array(COUNT * 3);
+    const distances = new Float32Array(COUNT);
+    const edgeFade = new Float32Array(COUNT);
+
+    let i = 0;
+    for (let ix = 0; ix < GRID; ix++) {
+      for (let iz = 0; iz < GRID; iz++) {
+        const x = (ix - GRID / 2) * SEPARATION;
+        const z = (iz - GRID / 2) * SEPARATION;
+        const dist = Math.sqrt(x * x + z * z);
+
+        positions[i * 3] = x;
+        positions[i * 3 + 1] = 0;
+        positions[i * 3 + 2] = z;
+
+        distances[i] = dist;
+        // 越靠边越暗，避免出现一个生硬的方框
+        edgeFade[i] = 1 - Math.min(1, dist / (GRID * SEPARATION * 0.52)) ** 2;
+        i++;
+      }
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    function makeSprite() {
+      const c = document.createElement('canvas');
+      c.width = c.height = 64;
+      const ctx = c.getContext('2d');
+      const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      g.addColorStop(0, 'rgba(255,255,255,1)');
+      g.addColorStop(0.25, 'rgba(190,235,255,0.85)');
+      g.addColorStop(0.6, 'rgba(90,160,220,0.18)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 64, 64);
+      return new THREE.CanvasTexture(c);
+    }
+
+    const material = new THREE.PointsMaterial({
+      size: 1.55,
+      vertexColors: true,
+      map: makeSprite(),
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true
+    });
+
+    const points = new THREE.Points(geometry, material);
+    scene.add(points);
+
+    /* ------------------------------------------------------------------
+       3. 音频：AnalyserNode → 四个慢变量
+          bass   低频能量    → 波峰高度
+          mid    中频能量    → 涟漪密度
+          treble 高频能量    → 细碎闪烁
+          level  整体响度    → 扩散速度
+       ------------------------------------------------------------------ */
+    const audioEl = document.getElementById('audio');
+    const audio = {
+      ctx: null, analyser: null, src: null, freq: null,
+      bass: 0, mid: 0, treble: 0, level: 0,
+      impact: 0, prevBass: 0, idle: 1
+    };
+
+    async function initAudio() {
+      if (!audio.ctx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        audio.ctx = new Ctx();
+        audio.analyser = audio.ctx.createAnalyser();
+        audio.analyser.fftSize = 1024;              // 1024 → 512 个频点
+        audio.analyser.smoothingTimeConstant = 0.72;
+        audio.analyser.minDecibels = -90;
+        audio.analyser.maxDecibels = -12;
+
+        try {
+          audio.src = audio.ctx.createMediaElementSource(audioEl);
+          audio.src.connect(audio.analyser);
+          audio.analyser.connect(audio.ctx.destination);
+        } catch (err) {
+          console.warn('[wave] audio graph:', err);
+        }
+        audio.freq = new Uint8Array(audio.analyser.frequencyBinCount);
+      }
+      // 现代浏览器：AudioContext 必须在用户手势后 resume
+      if (audio.ctx.state === 'suspended') await audio.ctx.resume();
+    }
+
+    const bandAverage = (freq, hz, lo, hi) => {
+      const a = Math.max(1, Math.floor(lo / hz));
+      const b = Math.min(freq.length - 1, Math.ceil(hi / hz));
+      if (b <= a) return 0;
+      let sum = 0;
+      for (let k = a; k <= b; k++) sum += freq[k];
+      return sum / (b - a + 1) / 255;
+    };
+
+    const follow = (cur, target, attack, release) =>
+      cur + (target - cur) * (target > cur ? attack : release);
+
+    function analyse(dt) {
+      if (!audio.analyser) {
+        audio.idle += (1 - audio.idle) * Math.min(1, dt * 1.5);
+        return;
+      }
+
+      audio.analyser.getByteFrequencyData(audio.freq);
+      const hz = audio.ctx.sampleRate / audio.analyser.fftSize;
+
+      const bassRaw = bandAverage(audio.freq, hz, 30, 160);
+      const midRaw = bandAverage(audio.freq, hz, 160, 2000);
+      const trebRaw = bandAverage(audio.freq, hz, 2000, 12000);
+      const levelRaw = bassRaw * 0.6 + midRaw * 0.3 + trebRaw * 0.1;
+
+      // 快起慢落：鼓点要一击到位，松开时不能抽搐
+      audio.bass = follow(audio.bass, bassRaw, 0.55, 0.06);
+      audio.mid = follow(audio.mid, midRaw, 0.35, 0.08);
+      audio.treble = follow(audio.treble, trebRaw, 0.5, 0.12);
+      audio.level = follow(audio.level, levelRaw, 0.4, 0.05);
+
+      // 一次鼓点 = 一次冲量，600ms 内收回，不做逐帧跟随
+      if (bassRaw > audio.prevBass + 0.10 && bassRaw > 0.22) audio.impact = 1;
+      audio.prevBass = bassRaw;
+      audio.impact = Math.max(0, audio.impact - dt / 0.6);
+
+      // 静音时保持一个很轻的呼吸，水面不会死掉
+      const targetIdle = audio.level < 0.02 ? 1 : 0;
+      audio.idle += (targetIdle - audio.idle) * Math.min(1, dt * 1.2);
+    }
+
+    /* ------------------------------------------------------------------
+       4. 水波
+       ------------------------------------------------------------------ */
+    const posArr = geometry.attributes.position.array;
+    const colArr = geometry.attributes.color.array;
+
+    const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+
+    let time = 0;
+    let last = performance.now();
+
+    // 静止时的呼吸曲线，保证没有音频也有东西可看
+    const idleAmp = (t) => 0.34 + 0.10 * Math.sin(t * 0.85);
+
+    function animate(now) {
+      requestAnimationFrame(animate);
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      time += dt;
+
+      analyse(dt);
+      controls.update();
+
+      const calmAmp = idleAmp(time);
+      // 有音乐时用音乐，没有音乐时用呼吸；两者取大，过渡是连续的
+      const drive = Math.max(calmAmp, audio.bass * 1.75 + audio.impact * 0.85);
+
+      const amp = 0.9 + drive * 3.1;                       // 波峰高度
+      const density = 0.34 + audio.mid * 0.55;             // 涟漪密度（空间频率）
+      const speed = 1.4 + audio.level * 3.8;               // 横向扩散速度
+      const shimmer = 0.25 + audio.treble * 1.6;           // 高频细纹
+
+      const phaseSpeed = time * speed;
+      const spin = time * 0.03;
+
+      for (let j = 0; j < COUNT; j++) {
+        const d = distances[j];
+        const fade = edgeFade[j];
+
+        // 主涟漪：从中心一圈圈推出去
+        const ripple = Math.sin(d * density - phaseSpeed);
+
+        // 次级干涉：让波纹不是完美的同心圆
+        const cross = Math.cos(d * density * 1.9 - phaseSpeed * 0.7 + 1.4);
+
+        // 越靠外越平：水波会散掉
+        const atten = Math.exp(-d * 0.013) * fade * (0.55 + 0.45 * Math.min(1, d / 26));
+
+        let y = (ripple * amp + cross * amp * 0.28) * atten;
+
+        // 高频只在波峰上闪烁，不抬高水面
+        y += Math.sin(time * 3.1 + d * 0.85) * shimmer * 0.32 * atten;
+
+        posArr[j * 3 + 1] = y;
+
+        // 颜色：低处是冷青，波峰烧成暖金
+        const h = clamp01((y + 2.1) / 5.4);
+        const glow = 0.55 + h * 0.75;
+
+        colArr[j * 3] = (0.16 + h * 0.86) * glow * (0.55 + fade * 0.45);
+        colArr[j * 3 + 1] = (0.60 + h * 0.26) * glow * (0.55 + fade * 0.45);
+        colArr[j * 3 + 2] = (0.86 - h * 0.30) * glow * (0.55 + fade * 0.45);
+      }
+
+      geometry.attributes.position.needsUpdate = true;
+      geometry.attributes.color.needsUpdate = true;
+
+      points.rotation.y = spin;
+
+      renderer.render(scene, camera);
+    }
+
+    /* ------------------------------------------------------------------
+       5. 交互
+       ------------------------------------------------------------------ */
+    const intro = document.getElementById('intro');
+    const titleEl = document.getElementById('title');
+    const metaEl = document.getElementById('meta');
+    const toastEl = document.getElementById('toast');
+    const fileInput = document.getElementById('file');
+    const btnPlay = document.getElementById('btn-play');
+
+    let toastTimer = 0;
+    function toast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('is-on');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.remove('is-on'), 2600);
+    }
+
+    const TRACKS = [
+      { title: '夜航', artist: 'NOCTURNE', src: 'assets/demo-1.mp3' },
+      { title: '深海', artist: 'NOCTURNE', src: 'assets/demo-2.mp3' },
+      { title: '潮汐', artist: 'NOCTURNE', src: 'assets/demo-5.mp3' },
+      { title: '余烬', artist: 'NOCTURNE', src: 'assets/demo-3.mp3' },
+      { title: '银盐', artist: 'NOCTURNE', src: 'assets/demo-4.mp3' },
+      { title: '空转', artist: 'NOCTURNE', src: 'assets/demo-6.mp3' }
+    ];
+    let trackIndex = 0;
+
+    function loadTrack(index) {
+      const track = TRACKS[index];
+      if (!track) return;
+      audioEl.src = track.src;
+      titleEl.textContent = track.title;
+      metaEl.textContent = (track.artist || 'WAVE').toUpperCase();
+      audioEl.play().catch(() => {});
+    }
+
+    function paintPlayIcon() {
+      const playing = !audioEl.paused;
+      btnPlay.innerHTML = playing
+        ? '<svg viewBox="0 0 24 24"><path d="M8.4 5.4v13.2M15.6 5.4v13.2"/></svg>'
+        : '<svg viewBox="0 0 24 24"><path d="M8 5.2 19 12 8 18.8z"/></svg>';
+    }
+
+    async function start() {
+      intro.classList.add('is-gone');
+      document.body.classList.add('is-live');
+      await initAudio();
+      if (!audioEl.src) loadTrack(0);
+      else audioEl.play().catch(() => {});
+      paintPlayIcon();
+    }
+
+    intro.addEventListener('click', start);
+
+    btnPlay.addEventListener('click', async () => {
+      await initAudio();
+      if (audioEl.paused) audioEl.play().catch(() => {});
+      else audioEl.pause();
+      paintPlayIcon();
+    });
+
+    document.getElementById('btn-load').addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      audioEl.src = URL.createObjectURL(file);
+      titleEl.textContent = file.name.replace(/\.[^.]+$/, '');
+      metaEl.textContent = 'LOCAL';
+      await initAudio();
+      audioEl.play().catch(() => {});
+      paintPlayIcon();
+      fileInput.value = '';
+    });
+
+    audioEl.addEventListener('play', paintPlayIcon);
+    audioEl.addEventListener('pause', paintPlayIcon);
+    audioEl.addEventListener('ended', () => { trackIndex = (trackIndex + 1) % TRACKS.length; loadTrack(trackIndex); });
+
+    addEventListener('keydown', (e) => {
+      if (e.key === ' ') { e.preventDefault(); btnPlay.click(); }
+    });
+
+    // 拖放
+    let dragDepth = 0;
+    addEventListener('dragenter', (e) => {
+      if (!e.dataTransfer || !Array.from(e.dataTransfer.types).includes('Files')) return;
+      e.preventDefault();
+      dragDepth++;
+      toast('松手，把歌丢进水里');
+    });
+    addEventListener('dragover', (e) => e.preventDefault());
+    addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); });
+    addEventListener('drop', async (e) => {
+      e.preventDefault();
+      dragDepth = 0;
+      const file = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!file) return;
+      audioEl.src = URL.createObjectURL(file);
+      titleEl.textContent = file.name.replace(/\.[^.]+$/, '');
+      metaEl.textContent = 'LOCAL';
+      await initAudio();
+      audioEl.play().catch(() => {});
+      intro.classList.add('is-gone');
+      document.body.classList.add('is-live');
+      paintPlayIcon();
+    });
+
+    // 系统媒体键
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.setActionHandler('play', () => audioEl.play());
+      navigator.mediaSession.setActionHandler('pause', () => audioEl.pause());
+    }
+
+    // 尺寸
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    requestAnimationFrame(animate);
+
+    // 截图 / 演示用：跳过手势直接进入（仅测试，不写进正常流程）
+    if (AUTO) {
+      intro.classList.add('is-gone');
+      document.body.classList.add('is-live');
+      initAudio().then(() => loadTrack(Number(params.get('track')) || 0));
+    }
+  })();
+  </script>
+</body>
+</html>

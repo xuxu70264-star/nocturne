@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#1e1e1e" />
+<title>Nocturne · 夜航</title>
+<meta name="description" content="Nocturne —— 一个把听歌当成看演出的沉浸式网页播放器。" />
+<link rel="manifest" href="manifest.webmanifest?v=20261027-1" />
+<link rel="apple-touch-icon" href="icons/icon-180.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Nocturne" />
+<link rel="stylesheet" href="css/fonts.css?v=20261027-1" />
+<link rel="stylesheet" href="css/style.css?v=20261027-1" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%2304050a'/><circle cx='16' cy='16' r='5' fill='%23e9d7bf'/></svg>" />
+</head>
+<body class="is-intro">
+
+  <!-- stage ------------------------------------------------------------->
+  <div class="stage" id="stage">
+    <canvas id="gl" aria-hidden="true"></canvas>
+    <div class="stage__panel" aria-hidden="true"></div>
+    <div class="stage__veil" aria-hidden="true"></div>
+    <canvas class="heart" id="heart" aria-hidden="true"></canvas>
+  </div>
+
+  <!-- hud --------------------------------------------------------------->
+  <div class="hud" id="hud">
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand__word">NOCTURNE</span>
+        <span class="brand__tag">夜航</span>
+      </div>
+      <nav class="nav" id="nav" aria-label="视图">
+        <button class="nav__item" data-nav="library" type="button">歌曲库</button>
+        <button class="nav__item" data-nav="wheel" type="button">轮盘</button>
+        <button class="nav__item" data-nav="shelf" type="button">歌单架</button>
+        <button class="nav__item" data-nav="gallery" type="button">画廊</button>
+        <button class="nav__item" data-nav="daily" type="button">日推</button>
+      </nav>
+      <div class="topbar__right">
+        <div class="presets" id="presets" role="group" aria-label="视觉预设"></div>
+        <span class="topbar__sep"></span>
+        <span class="brand__clock" id="clock">--:--</span>
+        <button class="login" id="login-btn" type="button" aria-haspopup="dialog" aria-controls="login-modal" aria-expanded="false">
+          <span class="login__avatar" id="login-avatar" hidden></span>
+          <span class="login__label" id="login-label">登录</span>
+        </button>
+        <button class="ghost-btn ghost-btn--icon" id="btn-full" type="button" aria-label="全屏">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 15v5h-5M20 9V4h-5M4 15v5h5"/></svg>
+        </button>
+        <div class="topbar__legacy" hidden>
+          <button id="btn-daily-mobile" type="button">日推</button>
+          <button id="btn-lyrics" type="button" aria-pressed="true">歌词</button>
+          <button id="btn-playlist" type="button" aria-expanded="false">曲目 <span id="list-count">1</span></button>
+        </div>
+      </div>
+    </header>
+
+    <!-- center: lyrics stage -->
+    <main class="center" id="center">
+      <div class="lyrics" id="lyrics">
+        <p class="lyrics__line lyrics__line--prev" id="lyric-prev"></p>
+        <p class="lyrics__line lyrics__line--cur" id="lyric-cur"></p>
+        <p class="lyrics__line lyrics__line--next" id="lyric-next"></p>
+      </div>
+
+      <div class="quiet" id="quiet">
+        <h1 class="quiet__title" id="quiet-title">夜航</h1>
+        <p class="quiet__artist" id="quiet-artist">NOCTURNE</p>
+        <div class="quiet__rule" aria-hidden="true"></div>
+        <p class="quiet__note" id="quiet-note">无歌词 · 纯音乐</p>
+      </div>
+    </main>
+
+    <!-- bottom: player -->
+    <footer class="dock" id="dock">
+      <div class="progress" id="progress" role="slider" tabindex="0"
+           aria-label="播放进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="progress__rail"></div>
+        <div class="progress__buffer" id="progress-buffer"></div>
+        <div class="progress__fill" id="progress-fill">
+          <span class="progress__knob"></span>
+        </div>
+      </div>
+
+      <div class="dock__row">
+        <div class="now">
+          <div class="now__index" id="track-index">01</div>
+          <div class="now__text">
+            <div class="now__title" id="track-title">夜航</div>
+            <div class="now__artist" id="track-artist">NOCTURNE</div>
+          </div>
+        </div>
+
+        <div class="transport">
+          <button class="t-btn" id="btn-prev" type="button" aria-label="上一首">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.5 5.5 9 12l9.5 6.5z"/><path d="M6 5.5v13"/></svg>
+          </button>
+          <button class="t-btn t-btn--play" id="btn-play" type="button" aria-label="播放">
+            <span class="pkey pkey--play" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M8 5.2 19 12 8 18.8z"/></svg>
+            </span>
+            <span class="pkey pkey--pause" aria-hidden="true">
+              <i class="pkey__bar"></i>
+              <i class="pkey__bar"></i>
+            </span>
+            <span class="pkey__ring" aria-hidden="true"></span>
+          </button>
+          <button class="t-btn" id="btn-next" type="button" aria-label="下一首">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 5.5 15 12l-9.5 6.5z"/><path d="M18 5.5v13"/></svg>
+          </button>
+        </div>
+
+        <div class="aside">
+          <span class="aside__time"><b id="t-cur">0:00</b><i>/</i><span id="t-dur">0:00</span></span>
+          <button class="vol__btn" id="btn-mute" type="button" aria-label="静音">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.2L12 5.6v12.8L7.2 14.5H4z"/><path class="vol__wave" d="M15.4 9.2a4 4 0 0 1 0 5.6"/><path class="vol__wave" d="M17.8 6.8a7.3 7.3 0 0 1 0 10.4"/></svg>
+          </button>
+          <input class="vol" id="vol" type="range" min="0" max="1" step="0.01" value="0.82" aria-label="音量" />
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- playlist drawer ---------------------------------------------------->
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer__head">
+      <div>
+        <div class="drawer__eyebrow">LIBRARY</div>
+        <div class="drawer__title">歌曲库</div>
+      </div>
+      <button class="drawer__close" id="drawer-close" type="button" aria-label="关闭">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="drawer__body">
+      <section class="nsearch" id="nsearch">
+        <div class="nsearch__head">
+          <span class="nsearch__label">网易云</span>
+          <span class="nsearch__state" id="nsearch-state">未登录</span>
+        </div>
+        <form class="nsearch__form" id="nsearch-form">
+          <input id="nsearch-input" type="search" placeholder="搜索歌曲 / 歌手" autocomplete="off" spellcheck="false" />
+          <button class="nsearch__go" type="submit" aria-label="搜索">→</button>
+        </form>
+        <p class="nsearch__hint" id="nsearch-hint">
+          <span id="nsearch-hint-text">登录后可搜索网易云</span>
+          <button class="nsearch__login" id="nsearch-login" type="button">去登录</button>
+        </p>
+        <ol class="nsearch__results" id="nsearch-results"></ol>
+      </section>
+      <div class="drawer__divider" id="library-divider">本地队列</div>
+      <ol class="playlist" id="playlist"></ol>
+    </div>
+    <div class="drawer__foot">
+      <button class="drawer__add" id="btn-add" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        添加本地音乐
+      </button>
+      <p class="drawer__tip">音乐与歌词只在你的浏览器里解码，不会上传。也可以直接把文件拖进页面。歌词支持 .lrc 与纯文本 .txt（没有时间戳会自动均分）。</p>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim" hidden></div>
+
+  <!-- shelf -------------------------------------------------------------->
+  <section class="shelf" id="shelf" aria-hidden="true" aria-label="歌单架">
+    <header class="shelf__head">
+      <div>
+        <div class="shelf__eyebrow">PLAYLISTS</div>
+        <div class="shelf__heading">歌单架</div>
+      </div>
+      <button class="shelf__close" id="shelf-close" type="button" aria-label="关闭歌单架">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </header>
+
+    <div class="shelf__stage" id="shelf-stage">
+      <div class="shelf__rail" id="shelf-rail"></div>
+    </div>
+
+    <footer class="shelf__foot">
+      <div class="shelf__now">
+        <span class="shelf__index" id="shelf-index">01 / 01</span>
+        <span class="shelf__title" id="shelf-title">夜航</span>
+        <span class="shelf__artist" id="shelf-artist">NOCTURNE</span>
+      </div>
+      <div class="shelf__hint">拖动 / 滚轮 浏览 · 点击载入歌单 · Esc 关闭</div>
+    </footer>
+  </section>
+
+  <!-- gallery ------------------------------------------------------------->
+  <section class="gallery" id="gallery" aria-hidden="true" aria-label="画廊选歌">
+    <header class="gallery__head">
+      <div>
+        <div class="gallery__eyebrow">GALLERY · PLAYLIST</div>
+        <div class="gallery__heading">画廊</div>
+      </div>
+      <button class="gallery__close" id="gallery-close" type="button" aria-label="关闭画廊">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </header>
+
+    <div class="gallery__stage" id="gallery-stage">
+      <div class="gallery__ring" id="gallery-ring"></div>
+    </div>
+
+    <footer class="gallery__foot">
+      <button class="gallery__nav" id="gallery-prev" type="button" aria-label="上一首">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5.5 8 12l7 6.5"/></svg>
+      </button>
+      <div class="gallery__now">
+        <span class="gallery__idx" id="gallery-idx">01 / 06</span>
+        <span class="gallery__name" id="gallery-name">夜航</span>
+        <span class="gallery__sub" id="gallery-sub">NOCTURNE</span>
+      </div>
+      <button class="gallery__nav" id="gallery-next" type="button" aria-label="下一首">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5.5 16 12l-7 6.5"/></svg>
+      </button>
+    </footer>
+  </section>
+
+  <!-- wheel --------------------------------------------------------------->
+  <section class="wheel" id="wheel" aria-hidden="true" aria-label="歌词轮盘">
+    <header class="wheel__head">
+      <div>
+        <div class="wheel__eyebrow">WHEEL</div>
+        <div class="wheel__heading">轮盘</div>
+      </div>
+      <button class="wheel__close" id="wheel-close" type="button" aria-label="返回">
+        <span class="wheel__back">返回</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </header>
+
+    <div class="wheel__stage" id="wheel-stage">
+      <div class="wheel__items" id="wheel-items"></div>
+
+      <aside class="wheel__card" id="wheel-card" aria-hidden="true">
+        <div class="wheel__stack" id="wheel-stack" aria-label="歌曲堆叠 · 上下拖动切换">
+          <canvas class="wheel__spectrum" id="wheel-spectrum" aria-hidden="true"></canvas>
+        </div>
+        <div class="wheel__cap">
+          <div class="drum" id="drum-no"><span>N°01 / 06</span><span></span></div>
+          <div class="drum drum--title" id="drum-title"><span>夜航</span><span></span></div>
+          <div class="drum" id="drum-sub"><span>NOCTURNE</span><span></span></div>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="wheel__foot">
+      <span>滚轮 / 拖动 浏览 · 点击某行跳转 · Esc 关闭</span>
+    </footer>
+  </section>
+
+  <!-- curtain ------------------------------------------------------------>
+  <div class="curtain" id="curtain">
+    <canvas class="paper-dots" id="paper-dots" aria-hidden="true"></canvas>
+    <div class="curtain__inner">
+      <h1 class="curtain__title">NOCTURNE<span class="curtain__cn">夜航</span></h1>
+      <p class="curtain__lead">把一首歌 变成一场演出</p>
+      <button class="enter" id="enter" type="button">
+        <span class="enter__text">进入</span>
+        <span class="enter__arrow" aria-hidden="true">→</span>
+      </button>
+      <p class="curtain__hint">建议戴耳机 · 支持拖入本地音频</p>
+    </div>
+  </div>
+
+  <!-- drop / toast ------------------------------------------------------->
+  <div class="drop" id="drop">
+    <div class="drop__box">
+      <div class="drop__title">松手</div>
+      <div class="drop__sub">音频文件与 .lrc 会被加入当前队列</div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- login -------------------------------------------------------------->
+  <div class="login-modal" id="login-modal" aria-hidden="true">
+    <div class="login-modal__scrim" data-login-close></div>
+    <section class="login-card" role="dialog" aria-modal="true" aria-labelledby="login-title">
+      <button class="login-card__close" type="button" data-login-close aria-label="关闭">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <p class="login-card__eyebrow">NETEASE CLOUD MUSIC</p>
+      <h2 class="login-card__title" id="login-title">扫码登录</h2>
+
+      <div class="login-card__body" id="login-body">
+        <div class="login-card__qr" id="login-qr">
+          <span class="login-card__spinner" aria-hidden="true"></span>
+        </div>
+        <p class="login-card__status" id="login-status">
+          <i aria-hidden="true"></i><span>正在生成二维码…</span>
+        </p>
+        <p class="login-card__hint" id="login-hint">打开网易云音乐 App · 扫一扫</p>
+
+        <div class="login-card__profile" id="login-profile" hidden>
+          <div class="login-card__avatar" id="login-profile-avatar" aria-hidden="true"></div>
+          <p class="login-card__name" id="login-profile-name">—</p>
+          <p class="login-card__signed">网易云音乐账号</p>
+        </div>
+      </div>
+
+      <div class="login-card__cookie" id="login-cookie-panel" hidden>
+        <p class="login-card__cookie-tip">
+          扫码被网易云拦截时：先打开
+          <a href="https://music.163.com" target="_blank" rel="noreferrer">music.163.com</a>
+          登录，再把 DevTools → Application → Cookies 里的 <code>MUSIC_U</code> 粘到这里。
+          只需登录一次，服务会把它保存在本机并在重启后自动恢复。
+        </p>
+        <textarea id="login-cookie-input" rows="3" spellcheck="false"
+          placeholder="MUSIC_U=...; __csrf=..."></textarea>
+        <button class="login-card__solid" id="login-cookie-submit" type="button">用 Cookie 登录</button>
+        <button class="login-card__ghost login-card__cookie-back" id="login-cookie-back" type="button">返回扫码</button>
+      </div>
+
+      <div class="login-card__actions">
+        <button class="login-card__ghost" id="login-refresh" type="button">刷新二维码</button>
+        <button class="login-card__ghost" id="login-cookie-btn" type="button">Cookie 登录</button>
+        <button class="login-card__ghost" id="login-logout" type="button" hidden>退出登录</button>
+        <button class="login-card__ghost login-card__ghost--quiet" type="button" data-login-close>关闭</button>
+      </div>
+      <p class="login-card__fine">登录 Cookie 只保存在本机 <code>.netease-session.json</code>，重启服务后自动恢复</p>
+    </section>
+  </div>
+
+  <input type="file" id="file-input" accept="audio/*,.lrc,.mp3,.flac,.wav,.m4a,.ogg" multiple hidden />
+  <audio id="audio" preload="metadata" crossorigin="anonymous"></audio>
+
+  <script src="vendor/qrcode.js?v=20261027-1"></script>
+  <script type="module" src="js/app.js?v=20261027-1"></script>
+</body>
+</html>

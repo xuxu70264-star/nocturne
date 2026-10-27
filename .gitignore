@@ -1,0 +1,12 @@
+# local NetEase cookie — never commit
+.netease-session.json
+*.tmp
+
+# release asset, uploaded through GitHub Releases instead
+Nocturne-*.zip
+
+# screenshots that contain a real account / personal playlists
+shots/shelf.png
+shots/library.png
+shots/login-*.png
+shots/netease-play.png
